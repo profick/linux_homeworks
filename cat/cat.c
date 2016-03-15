@@ -10,8 +10,8 @@ int main()
 
     while ((retIn = read(STDIN_FILENO, &buffer, BUF_SIZE)) > 0) {
         retOut = write(STDOUT_FILENO, &buffer, (ssize_t) retIn);
-        if (retOut < retIn) {
-            write(STDOUT_FILENO, &buffer + retIn - retOut, retIn - retOut);
+        while (retOut < retIn) {
+            retOut = retOut + write(STDOUT_FILENO, &buffer + retIn - retOut, retIn - retOut);
         }
     }
 
