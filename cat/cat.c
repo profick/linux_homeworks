@@ -11,7 +11,7 @@ int main()
     while ((retIn = read(STDIN_FILENO, &buffer, BUF_SIZE)) > 0) {
         retOut = write(STDOUT_FILENO, &buffer, (ssize_t) retIn);
         while (retOut < retIn) {
-            retOut = retOut + write(STDOUT_FILENO, &buffer + retIn - retOut, retIn - retOut);
+            retOut = retOut + write(STDOUT_FILENO, &buffer + retOut, retIn - retOut);
         }
     }
 
