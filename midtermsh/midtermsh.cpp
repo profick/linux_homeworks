@@ -3,11 +3,17 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-//#include <bits/stl_vector.h>
+#include <vector>
+#include <stdio.h>
 
 const int BUF_SIZE = 1024;
 
 using namespace std;
+
+void handler(int signum, siginfo_t* siginfo, void* context) {
+
+}
+
 
 char* read_line() {
     //allocate memory for buffer
@@ -56,6 +62,7 @@ char* read_line() {
 }
 
 char** split_line(char* text) {
+
     int buffer_size = BUF_SIZE;
     int position = 0;
     char* token;
@@ -69,6 +76,7 @@ char** split_line(char* text) {
 
     token = strtok(text, " \t\n\r\a");
     while (token != NULL) {
+
         arguments[position++] = token;
         if (position >= buffer_size) {
             buffer_size *= 2;
@@ -79,9 +87,10 @@ char** split_line(char* text) {
                 exit(EXIT_FAILURE);
             }
         }
-        token = strtok(NULL, "\t\n\r\a");
+        token = strtok(NULL, " \t\n\r\a");
     }
     arguments[position] = NULL;
+
     return arguments;
 }
 
@@ -107,45 +116,111 @@ int launch_single(char** args) {
             wpid = waitpid(pid, &status, WUNTRACED);
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
         if (WIFSIGNALED(status)) {
-            string str = "stopped by signal " + WTERMSIG(status);
-            str += ".\n";
-            write(STDOUT_FILENO, &str, str.length());
+//            string str = "stopped by signal " + WTERMSIG(status);
+//            str += ".\n";
+//            write(STDOUT_FILENO, &str, str.length());
         }
     }
     return 1;
 }
 
-//int launch_pipe(char** args, vector<int> pipes) {
-//    int fds[2];
-//    pipe(fds);
-//    pid_t pid;
-//
-//    if (fork() == 0) {
-//        dup2(fds[0], 0);
-//        close(fds[1]);
-//        execvp()
-//    }
-//}
+int launch_pipe(char** args, vector<int> pipes) {
+    vector<int> pid_array;
+    int pipefd[2];
+    int oldpipefd[2];
+    pid_t pid;
+    char** command = (char**) malloc(BUF_SIZE * sizeof(char*));
+    for (int i = 0; i < pipes[0]; i++) {
+        command[i] = args[i];
+    }
+    command[pipes[0]] = NULL;
+    pipe(pipefd);
+    if (pid = fork() == 0) {
+        dup2(pipefd[1], 1);
+        close(pipefd[0]);
+        execvp(command[0], command);
+    } else {
+        int status;
+        do {
+            waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+    pid_array.push_back(pid);
+    oldpipefd[0] = pipefd[0];
+    oldpipefd[1] = pipefd[1];
 
-//vector<int> count_pipes(char** args) {
-//    vector<int> pipes;
-//    int index = 0;
-//    while (args[index] != NULL) {
-//        if (*args[index] == '|') {
-//            pipes.push_back(index++);
-//        }
-//    }
-//    return pipes;
-//}
+    for (int i = 1; i < pipes.size(); i++) {
 
-//int execute(char** args) {
-//    vector<int> pipes = count_pipes(args);
-//    if (pipes.size() == 0) {
-//        launch_single(args);
-//    } else {
-//        launch_pipe(args, pipes);
-//    }
-//}
+        pipe(pipefd);
+        if (pid = fork()) {
+            close(oldpipefd[0]);
+            close(oldpipefd[1]);
+        } else {
+            dup2(oldpipefd[0], 0);
+            close(oldpipefd[1]);
+            dup2(pipefd[1], 1);
+
+            for (int j = 0; j < pipes[i + 1] - pipes[i] - 1; j++) {
+                command[j] = args[pipes[i] + j + 1];
+            }
+            command[pipes[i + 1] - pipes[i] - 1] = NULL;
+            execvp(command[0], command);
+
+        }
+        pid_array.push_back(pid);
+        oldpipefd[0] = pipefd[0];
+        oldpipefd[1] = pipefd[1];
+
+    }
+
+    for (int i = pipes[pipes.size() - 1] + 1; ; i++) {
+        command[i - (pipes[pipes.size() - 1] + 1)] = args[i];
+        if (args[i] == NULL) {
+            break;
+        }
+    }
+
+    pipe(pipefd);
+    if (pid = fork()) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+    } else {
+        dup2(oldpipefd[0], 0);
+        close(oldpipefd[1]);
+        execvp(command[0], command);
+    }
+
+    pid_array.push_back(pid);
+
+    free(command);
+    return 1;
+}
+
+
+vector<int> count_pipes(char** args) {
+    vector<int> pipes;
+    int index = 0;
+    while (args[index] != NULL) {
+        if (*args[index] == '|') {
+            pipes.push_back(index);
+
+        }
+
+        index++;
+    }
+    return pipes;
+}
+
+int execute(char** args) {
+    vector<int> pipes = count_pipes(args);
+    if (pipes.size() == 0) {
+        launch_single(args);
+    } else {
+
+        launch_pipe(args, pipes);
+    }
+    return 1;
+}
 
 
 void loop() {
@@ -154,8 +229,9 @@ void loop() {
 
     do {
         write(STDOUT_FILENO, "$ ", 2);
-        args = split_line(read_line());
-        status = launch_single(args);
+        char* line = read_line();
+        args = split_line(line);
+        status = execute(args);
 
         free(args);
     } while (status);
