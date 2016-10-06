@@ -6,7 +6,7 @@
 #include <vector>
 #include <stdio.h>
 
-#define BUF_SIZE 1
+#define BUF_SIZE 1024
 #define READ 0
 #define WRITE 1
 
