@@ -6,7 +6,7 @@
 #include <vector>
 #include <stdio.h>
 
-#define BUF_SIZE 1024
+#define BUF_SIZE 1
 #define READ 0
 #define WRITE 1
 
@@ -140,25 +140,28 @@ string read_line() {
     char buffer[BUF_SIZE];
     size_t pos = 0;
     int retIn = 0;
-    //reading a command from STDIN
-    while (retIn = read(STDIN_FILENO, buffer, BUF_SIZE)) {
-        if (retIn != -1) {
-            command_buffer.append(buffer, retIn);
+
+    if (command_buffer.empty() || (pos = command_buffer.find_first_of('\n')) == string::npos) {
+        //reading a command from STDIN
+        while (retIn = read(STDIN_FILENO, buffer, BUF_SIZE)) {
+            if (retIn != -1) {
+                command_buffer.append(buffer, retIn);
+            }
+
+            if ((pos = command_buffer.find_first_of('\n')) != string::npos) {
+                break;
+            }
+
+            buffer[0] = '\0';
         }
 
-
-
-
-        if ((pos = command_buffer.find_first_of('\n')) != string::npos) {
-            break;
+        if (retIn == 0) {
+            notEOF = 0;
         }
 
-        buffer[0] = '\0';
     }
 
-    if (retIn == 0) {
-        notEOF = 0;
-    }
+    
     string command = command_buffer.substr(0, pos);
     command_buffer.erase(0, pos + 1);
     return command;
